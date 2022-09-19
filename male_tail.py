@@ -13,39 +13,47 @@ SLEEP_TIME = 0.01  # seconds
 LINE_LENGTH_BYTES = 128
 
 
+def get_args():
+    parser = argparse.ArgumentParser(
+        description='Like tail but the same.)'
+    )
+    parser.add_argument('--path', help='path to file', required=True)
+    parser.add_argument('-n', help='lines to read')
+    parser.add_argument('-f', help='follow', action='store_true')
+
+    return parser.parse_args()
+
+
+class MaleTailArgs(object):
+    """
+    Data structure class contains required args to MaleTail
+    """
+    def __init__(self, args: argparse.Namespace):
+        self.path_to_file = args.path
+        self.lines_count = int(args.n) if args.n else DEFAULT_N_LINES
+        self.follow = args.f
+
+
 class MaleTail(object):
     """
     Tool like UNIX "tail"
     """
 
-    def __init__(self, args=None):
-        self.args = self.get_args(args)
-        self.path_to_file = self.args.path
-        self.lines_count = int(self.args.n) if self.args.n else DEFAULT_N_LINES
-        self.follow = self.args.f
-        self.line_length_bytes = LINE_LENGTH_BYTES
-        self.file_descriptor = None
-        self.result_list = []
-
+    def __init__(self, path_to_file: str, lines_count: int, follow: bool):
         logging.basicConfig(level=logging.INFO)
         self.log = logging.getLogger()
-
+        self.path_to_file = path_to_file
+        self.lines_count = lines_count
+        self.follow = follow
+        self.line_length_bytes = LINE_LENGTH_BYTES
         if not os.path.exists(self.path_to_file):
             self.log.error('File does not exists')
             exit(0)
+        else:
+            self.file_descriptor = None
+        self.result_list = []
 
-    @staticmethod
-    def get_args(args: list):
-        parser = argparse.ArgumentParser(
-            description='Like tail but the same.)'
-        )
-        parser.add_argument('-f', help='follow', action='store_true')
-        parser.add_argument('-n', help='lines to read')
-        parser.add_argument('--path', help='path to file', required=True)
-
-        return parser.parse_args(args)
-
-    def print_whole_file(self):
+    def _print_whole_file(self):
         self.file_descriptor.seek(0)
         sys.stdout.write(
             ''.join([line.decode() for line in
@@ -67,7 +75,7 @@ class MaleTail(object):
                     self.log.debug(
                         'File is too small to seek {} bytes from end'.format(
                             -self.lines_count * self.line_length_bytes))
-                    self.print_whole_file()
+                    self._print_whole_file()
                     break
 
             for line in self.file_descriptor:
@@ -80,9 +88,6 @@ class MaleTail(object):
                 self.line_length_bytes = self.line_length_bytes * 2
 
         sys.stdout.write(''.join(self.result_list))
-
-    def get_result_list(self):
-        return self.result_list
 
     def follow_file(self):
         """Second part. Following the file"""
@@ -101,5 +106,6 @@ class MaleTail(object):
 
 
 if __name__ == '__main__':
-    app = MaleTail()
+    args = MaleTailArgs(get_args())
+    app = MaleTail(args.path_to_file, args.lines_count, args.follow)
     app.run()
